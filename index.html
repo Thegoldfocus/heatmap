@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market Heatmap</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#000;overflow:hidden;height:100%}
+
+.row{
+  display:flex;
+  width:100%;
+  gap:3px;
+  padding:3px 3px 0;
+}
+.row:last-child{padding-bottom:3px}
+
+.widget{
+  flex:1;
+  padding:6px 14px 7px;
+  text-align:center;
+  background:#b71c1c;
+  border-radius:2px;
+}
+
+.label{
+  font-family:'Arial Black',Arial,sans-serif;
+  font-size:18px;
+  font-weight:900;
+  color:#FFFFFF;
+  line-height:1.3;
+  white-space:nowrap;
+}
+.ask{
+  font-family:'Arial Black',Arial,sans-serif;
+  font-size:28px;
+  font-weight:900;
+  color:#fff;
+  line-height:1.2;
+  white-space:nowrap;
+  transition:opacity 0.15s;
+}
+.pct{
+  font-family:'Arial Black',Arial,sans-serif;
+  font-size:14px;
+  font-weight:900;
+  color:#FFFFFF;
+  line-height:1.3;
+  white-space:nowrap;
+}
+
+.upper{background:#b71c1c}
+.up{background:#c62828}
+.lower{background:#1b5e20}
+.low{background:#2e7d32}
+.nochange{background:#555}
+
+.lower .label, .low .label{color:#B9F6CA}
+.lower .pct, .low .pct{color:#69F0AE}
+.nochange .label, .nochange .pct{color:#aaa}
+</style>
+</head>
+<body>
+
+<div class="row">
+  <div class="widget" id="w0"><div class="label">Gold Spot</div><div class="ask">&nbsp;</div><div class="pct">&nbsp;</div></div>
+  <div class="widget" id="w1"><div class="label">THB</div><div class="ask">&nbsp;</div><div class="pct">&nbsp;</div></div>
+  <div class="widget" id="w2"><div class="label">Silver Spot</div><div class="ask">&nbsp;</div><div class="pct">&nbsp;</div></div>
+</div>
+<div class="row">
+  <div class="widget" id="w3"><div class="label">Gold 96.5%</div><div class="ask">&nbsp;</div><div class="pct">&nbsp;</div></div>
+  <div class="widget" id="w4"><div class="label">Gold 99.99%</div><div class="ask">&nbsp;</div><div class="pct">&nbsp;</div></div>
+  <div class="widget" id="w5"><div class="label">Silver (Kg)</div><div class="ask">&nbsp;</div><div class="pct">&nbsp;</div></div>
+</div>
+
+<script>
+// ===== CONFIG =====
+var API_URL = 'https://script.google.com/macros/s/AKfycbwQojpZLc7fUDN5wTdaZUYpWrIv6y52zrPEFArjMZR1gR2H0E6pgLY_uz0RhksgPqz7/exec';
+var GM=0.60, SM=0.04, TM=0.02, GP=15, SP=900;
+var REFRESH_MS = 10000;
+
+// ===== UTILS =====
+function rd(v,d){var r=parseFloat(parseFloat(v).toFixed(d));return isNaN(r)?0:r;}
+function fm(n,s,c){var v=parseFloat(n),t=n.toString();if(c){var p=t.split('.');p[0]=p[0].replace(/\B(?=(\d{3})+(?=$))/g,',');t=p.join('.');}if(s&&v>0)t='+'+t;return t;}
+function cc(p){if(p<=-0.5)return'upper';if(p<0)return'up';if(p>=0.5)return'lower';if(p>0)return'low';return'nochange';}
+
+// ===== RENDER =====
+function upd(data){
+  if(!data||data.error)return;
+  var xa=Number(data.xau.ask)+GM, xc=xa-Number(data.xau.changes);
+  var sa=Number(data.xag.ask)+SM, sc=sa-Number(data.xag.changes);
+  var ta=Number(data.thb.ask)+TM, tc=ta-Number(data.thb.changes);
+  var W=[
+    {a:rd(xa,2),c:rd(xc,2),d:2},
+    {a:rd(ta,2),c:rd(tc,2),d:2},
+    {a:rd(sa,2),c:rd(sc,2),d:2},
+    {a:Math.ceil(xa*0.49*0.965*ta+GP),c:Math.ceil(xc*0.49*0.965*tc+GP),d:0},
+    {a:Math.ceil(xa*0.49*ta+GP),c:Math.ceil(xc*0.49*tc+GP),d:0},
+    {a:Math.ceil(sa*32.1507*ta+SP),c:Math.ceil(sc*32.1507*tc+SP),d:0}
+  ];
+  for(var i=0;i<W.length;i++){
+    var w=W[i],ask=rd(w.a,w.d),cls=rd(w.c,w.d),chg=rd(ask-cls,w.d),pct=rd(chg/cls*100,2);
+    var el=document.getElementById('w'+i),ae=el.querySelector('.ask'),pe=el.querySelector('.pct');
+    var nv=fm(ask,false,true);
+    var old=ae.textContent.trim();
+    if(old!==''&&old!==' '&&old!==nv){
+      ae.style.opacity='0';
+      (function(e,v){setTimeout(function(){e.textContent=v;e.style.opacity='1';},150);})(ae,nv);
+    }else{ae.textContent=nv;}
+    pe.textContent=fm(chg,true,false)+' ('+fm(pct,true,false)+'%)';
+    el.className='widget '+cc(pct);
+  }
+}
+
+// ===== JSONP FETCH (works cross-origin, no login needed) =====
+var jsonpCounter = 0;
+function fetchPrices(){
+  var cbName = '_hm_cb_' + (jsonpCounter++);
+  window[cbName] = function(data){
+    upd(data);
+    delete window[cbName];
+    var s = document.getElementById(cbName);
+    if(s) s.parentNode.removeChild(s);
+  };
+  var s = document.createElement('script');
+  s.id = cbName;
+  s.src = API_URL + '?callback=' + cbName;
+  document.body.appendChild(s);
+}
+
+// Start
+fetchPrices();
+setInterval(fetchPrices, REFRESH_MS);
+</script>
+</body>
+</html>
