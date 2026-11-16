@@ -76,7 +76,9 @@ html,body{background:#000;overflow:hidden;height:100%}
 
 <script>
 // ===== CONFIG =====
-var API_URL = 'https://script.google.com/macros/s/AKfycbwQojpZLc7fUDN5wTdaZUYpWrIv6y52zrPEFArjMZR1gR2H0E6pgLY_uz0RhksgPqz7/exec';
+// *** เปลี่ยนตรงนี้เป็น URL ของ Cloudflare Worker ของคุณ ***
+var API_URL = 'https://heatmap-proxy.goldfocuss.workers.dev/';
+
 var GM=0.60, SM=0.04, TM=0.02, GP=15, SP=900;
 var REFRESH_MS = 10000;
 
@@ -113,25 +115,16 @@ function upd(data){
   }
 }
 
-// ===== JSONP FETCH (works cross-origin, no login needed) =====
-var jsonpCounter = 0;
-function fetchPrices(){
-  var cbName = '_hm_cb_' + (jsonpCounter++);
-  window[cbName] = function(data){
-    upd(data);
-    delete window[cbName];
-    var s = document.getElementById(cbName);
-    if(s) s.parentNode.removeChild(s);
-  };
-  var s = document.createElement('script');
-  s.id = cbName;
-  s.src = API_URL + '?callback=' + cbName;
-  document.body.appendChild(s);
+// ===== FETCH (plain CORS fetch — works in every browser) =====
+function tick(){
+  fetch(API_URL)
+    .then(function(r){ return r.json(); })
+    .then(upd)
+    .catch(function(){});
 }
 
-// Start
-fetchPrices();
-setInterval(fetchPrices, REFRESH_MS);
+tick();
+setInterval(tick, REFRESH_MS);
 </script>
 </body>
 </html>
